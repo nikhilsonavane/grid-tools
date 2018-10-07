@@ -1,6 +1,6 @@
 {
   "name": "@integec/grid-tools",
-  "version": "3.1.1",
+  "version": "3.1.1-alpha",
   "description": "Integ Grid Tools",
   "main": "lib/index.js",
   "scripts": {

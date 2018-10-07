@@ -7883,7 +7883,7 @@ react-modal@^3.3.2:
     prop-types "^15.5.10"
     warning "^3.0.0"
 
-react-popper@^1.0.0-beta.6:
+react-popper@1.0.0-beta.6:
   version "1.0.0-beta.6"
   resolved "https://registry.yarnpkg.com/react-popper/-/react-popper-1.0.0-beta.6.tgz#cb27a2ac56adccbaf5f9c4132387289069240834"
   integrity sha1-yyeirFatzLr1+cQTI4cokGkkCDQ=

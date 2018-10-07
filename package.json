@@ -1,6 +1,6 @@
 {
   "name": "@integec/grid-tools",
-  "version": "2.1.1",
+  "version": "3.1.1",
   "description": "Integ Grid Tools",
   "main": "lib/index.js",
   "scripts": {
@@ -67,9 +67,9 @@
     "downshift": "^1.31.4",
     "fbjs": "^0.8.16",
     "ramda": "^0.25.0",
-    "react": ">=16",
+    "react": "^16.5.2",
     "react-broadcast": "^0.7.0",
-    "react-dom": ">=16",
+    "react-dom": "^16.5.2",
     "react-popper": "^1.0.0-beta.6",
     "react-virtualized": "^9.18.5",
     "styled-components": "2.4.0"

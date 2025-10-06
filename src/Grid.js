@@ -32,11 +32,13 @@ import {
 } from './editEngine'
 import {
   selector,
-  normalizeSelection,
   isCellSelected,
   isRowSelected,
   getSelectedData,
-} from './selection-util'
+  getGlobalColumnRange,
+  toggleSelection,
+  selectRange,
+} from './new-selection-utils'
 
 import {
   ROW_INDEX_ATTRIBUTE,
@@ -278,10 +280,12 @@ class Grid extends React.PureComponent {
   state = {
     hoveredRow: undefined,
     hoveredColumn: undefined,
-    x1: undefined,
-    x2: undefined,
-    y1: undefined,
-    y2: undefined,
+    bitMaskMap: {},
+    previousRectangleSelection: { x1: undefined, y1: undefined, x2: undefined, y2: undefined },
+    // x1: undefined,
+    // x2: undefined,
+    // y1: undefined,
+    // y2: undefined,
     ...computeView({
       data: this.props.data,
       sortOptions: this.props.initialSortOptions || this.props.sortOptions,
@@ -310,7 +314,19 @@ class Grid extends React.PureComponent {
   }
 
   setSelectedRect = rect => {
-    this.setState(rect, this.selectionChanged)
+    const newSelection = { ...rect }
+    const { x1, y1, x2, y2, isCtrl } = newSelection
+    const newBitMaskMap = selectRange(
+      this.props.selectionMode === 'multi' && !!isCtrl ? { ...this.state.bitMaskMap } : {},
+      x1,
+      y1,
+      this.props.selectionMode === 'multi' ? x2 : x1,
+      this.props.selectionMode === 'multi' ? y2 : y1
+    )
+    this.setState(
+      { bitMaskMap: newBitMaskMap, previousRectangleSelection: newSelection },
+      this.selectionChanged
+    )
   }
 
   componentDidMount() {
@@ -535,26 +551,45 @@ class Grid extends React.PureComponent {
 
   /*  selection starts */
 
-  selectRight = expand => {
+  selectRight = (expand, isCtrl) => {
     this.setState(
-      selector.right(this.state, expand, this.props.headers.length, this.state.view.length),
+      selector.right(this.state, expand, isCtrl, this.props.headers.length),
       this.selectionChanged
     )
   }
 
-  selectLeft = expand => {
+  selectLeft = (expand, isCtrl) => {
     this.setState(
-      selector.left(this.state, expand, this.props.headers.length, this.state.view.length),
+      selector.left(
+        this.state,
+        this.props.selectionMode === 'multi' && expand,
+        this.props.selectionMode === 'multi' && isCtrl
+      ),
       this.selectionChanged
     )
   }
 
-  selectTop = expand => {
-    this.setState(selector.up(this.state, expand), this.selectionChanged)
+  selectTop = (expand, isCtrl) => {
+    this.setState(
+      selector.up(
+        this.state,
+        this.props.selectionMode === 'multi' && expand,
+        this.props.selectionMode === 'multi' && isCtrl
+      ),
+      this.selectionChanged
+    )
   }
 
-  selectBottom = expand => {
-    this.setState(selector.down(this.state, expand, this.state.view.length), this.selectionChanged)
+  selectBottom = (expand, isCtrl) => {
+    this.setState(
+      selector.down(
+        this.state,
+        this.props.selectionMode === 'multi' && expand,
+        this.props.selectionMode === 'multi' && isCtrl,
+        this.state.view.length
+      ),
+      this.selectionChanged
+    )
   }
 
   selectAll = () => {
@@ -564,15 +599,37 @@ class Grid extends React.PureComponent {
     )
   }
 
-  startSelectionState(rowIndex, columnIndex) {
+  startSelectionState(rowIndex, columnIndex, isShift, isCtrl) {
     this.selecting = this.props.selectionMode === 'multi' && true
-    return { x1: columnIndex, y1: rowIndex, x2: columnIndex, y2: rowIndex }
+    return toggleSelection(
+      rowIndex,
+      columnIndex,
+      isShift,
+      isCtrl,
+      this.state,
+      !(this.props.selectionType === 'cell')
+    )
   }
 
-  expandSelectionState(rowIndex, columnIndex, ended) {
+  expandSelectionState(rowIndex, columnIndex, ended, isCtrl) {
     if (this.selecting && this.props.selectionMode === 'multi') {
       this.selecting = ended ? false : this.selecting
-      return { y2: rowIndex, x2: columnIndex }
+      return toggleSelection(
+        rowIndex,
+        columnIndex,
+        true,
+        isCtrl,
+        this.state,
+        !(this.props.selectionType === 'cell')
+      )
+      // return {
+      //   previousRectangleSelection: {
+      //     x1: (this.state || {}).previousRectangleSelection.x1 || columnIndex,
+      //     y1: rowIndex,
+      //     x2: columnIndex,
+      //     y2: (this.state || {}).previousRectangleSelection.y2 || rowIndex,
+      //   },
+      // }
     }
   }
 
@@ -581,29 +638,50 @@ class Grid extends React.PureComponent {
     const { headers, onSelectionChange } = this.props
     // console.log(this.state.x1, this.state.y1, this.state.x2, this.state.y2)
     if (onSelectionChange) {
-      const { x1, x2, y1, y2 } = normalizeSelection(this.state)
+      const { bitMaskMap, view } = { ...this.state }
+      const { minCol, maxCol } = getGlobalColumnRange(bitMaskMap)
+
       const selectedRows = []
       const selectedHeaders = []
-      const { view } = this.state
 
-      for (let r = y1; r <= y2; r++) {
-        if (view[r] != null) selectedRows.push(view[r])
+      if (minCol === undefined || maxCol === undefined) {
+        onSelectionChange({ selectedRows, selectedHeaders })
+        return
       }
-      for (let c = x1; c <= x2; c++) {
+      Object.keys(bitMaskMap).map(r => {
+        const rNumber = BigInt(r)
+        if (bitMaskMap[r]) selectedRows.push(view[rNumber])
+      })
+      R.range(minCol, maxCol + 1).map(c => {
         if (headers[c] != null) selectedHeaders.push(headers[c])
-      }
+      })
 
       onSelectionChange({ selectedRows, selectedHeaders })
     }
+    // if (onSelectionChange) {
+    //   const { x1, x2, y1, y2 } = normalizeSelection(this.state)
+    //   const selectedRows = []
+    //   const selectedHeaders = []
+    //   const { view } = this.state
+
+    //   for (let r = y1; r <= y2; r++) {
+    //     if (view[r] != null) selectedRows.push(view[r])
+    //   }
+    //   for (let c = x1; c <= x2; c++) {
+    //     if (headers[c] != null) selectedHeaders.push(headers[c])
+    //   }
+
+    //   onSelectionChange({ selectedRows, selectedHeaders })
+    // }
   }
 
   getSelectionInfo = _ => ({
-    ...normalizeSelection(this.state),
+    ...(this.state.previousRectangleSelection || {}),
     rawPositions: {
-      x1: this.state.x1,
-      x2: this.state.x2,
-      y1: this.state.y1,
-      y2: this.state.y2,
+      x1: (this.state.previousRectangleSelection || {}).x1,
+      x2: (this.state.previousRectangleSelection || {}).x2,
+      y1: (this.state.previousRectangleSelection || {}).y1,
+      y2: (this.state.previousRectangleSelection || {}).y2,
     },
   })
 
@@ -736,7 +814,7 @@ class Grid extends React.PureComponent {
   }
 
   gridKeyDown = e => {
-    const { x2: columnIndex, y2: rowIndex } = normalizeSelection(this.state)
+    const { x2: columnIndex, y2: rowIndex } = this.state.previousRectangleSelection || {}
     const selectionValid = !R.isNil(columnIndex) && !R.isNil(rowIndex)
     if (selectionValid) {
       const isEditAttempt =
@@ -755,11 +833,11 @@ class Grid extends React.PureComponent {
       }
 
       if (!this.isGridEditing()) {
-        if (e.keyCode === 37) this.selectLeft(e.shiftKey)
-        if (e.keyCode === 39) this.selectRight(e.shiftKey)
-        if (e.keyCode === 38) this.selectTop(e.shiftKey)
-        if (e.keyCode === 40) this.selectBottom(e.shiftKey)
-        if (e.ctrlKey && e.keyCode === 65) this.selectAll()
+        if (e.keyCode === 37) this.selectLeft(e.shiftKey, e.ctrlKey)
+        if (e.keyCode === 39) this.selectRight(e.shiftKey, e.ctrlKey)
+        if (e.keyCode === 38) this.selectTop(e.shiftKey, e.ctrlKey)
+        if (e.keyCode === 40) this.selectBottom(e.shiftKey, e.ctrlKey)
+        if (e.ctrlKey && e.keyCode === 65 && this.props.selectionMode === 'multi') this.selectAll()
         if (e.keyCode === 9) {
           e.preventDefault()
           e.shiftKey ? this.selectLeft() : this.selectRight()
@@ -793,23 +871,26 @@ class Grid extends React.PureComponent {
   }
 
   cellMouseDown = e => {
+    const isShift = e.shiftKey
+    const isCtrl = e.ctrlKey || e.metaKey
     const pos = extractPosition(e)
     const { rowIndex, columnIndex } = pos
     if (e.button === 2 && isCellSelected(rowIndex, columnIndex, this.state)) return
-    this.setState(_ => this.startSelectionState(rowIndex, columnIndex), this.selectionChanged)
+    this.setState(
+      _ =>
+        this.startSelectionState(
+          rowIndex,
+          columnIndex,
+          this.props.selectionMode === 'multi' && isShift,
+          this.props.selectionMode === 'multi' && isCtrl
+        ),
+      this.selectionChanged
+    )
   }
 
-  cellMouseUp = e => {
-    const pos = extractPosition(e)
-    const { rowIndex, columnIndex } = pos
-    const isSelecting = this.selecting
-    this.setState(
-      _ => this.expandSelectionState(rowIndex, columnIndex, true),
-      () => {
-        this.focusGrid()
-        isSelecting && this.selectionChanged()
-      }
-    )
+  cellMouseUp = () => {
+    this.selecting = false
+    this.focusGrid()
   }
 
   cellMouseEnter = e => {
@@ -819,7 +900,7 @@ class Grid extends React.PureComponent {
     this.setState(
       _ => ({
         ...this.hoverState(rowIndex, columnIndex),
-        ...this.expandSelectionState(rowIndex, columnIndex),
+        ...this.expandSelectionState(rowIndex, columnIndex, false, e.ctrlKey),
       }),
       isSelecting ? this.selectionChanged : undefined
     )
@@ -953,7 +1034,7 @@ class Grid extends React.PureComponent {
   })
 
   getRowEditorProps = _ => {
-    const { y1 } = normalizeSelection(this.state)
+    const { y1 } = this.state.previousRectangleSelection || {}
     const { addWithSelected } = this.props
     return {
       onClose: this.cancelEdit,
@@ -992,11 +1073,11 @@ class Grid extends React.PureComponent {
   clipboardHelperRefHandler = node => (this.clipboardHelper = node)
 
   onCopy = e => {
-    const selection = normalizeSelection(this.state)
+    const selection = this.state
     if (this.isDebug()) console.log('copied selection', selection)
     const { view: data } = this.state
-    const { headers } = this.props
-    const selectedData = getSelectedData({ headers, data }, selection)
+    const { headers, selectionType } = this.props
+    const selectedData = getSelectedData({ headers, data }, selection, selectionType)
     if (this.isDebug()) console.log('copied data', selectedData)
     const rawClipboardData = toClipboardData(selectedData)
     if (this.isDebug()) console.log('copied clip board data', rawClipboardData)
@@ -1040,24 +1121,39 @@ class Grid extends React.PureComponent {
   }
 
   deleteSelection = () => {
-    const selection = normalizeSelection(this.state)
-    const { x1, x2, y1, y2 } = this.state
-    const { headers } = this.props
+    const { bitMaskMap } = this.state
+    const { headers, selectionType } = this.props
     const { view } = this.state
-    if (this.isDebug()) console.log('deleting selection', selection)
-    if (this.isDebug()) console.log('view is', view, 'heder is', headers)
-    const updates = R.range(y1, y2 + 1)
-      .map(row => view[row])
-      .map(currentRow => ({
+    if (!bitMaskMap || Object.keys(bitMaskMap).length === 0) return
+
+    const { minCol, maxCol } = getGlobalColumnRange(bitMaskMap)
+
+    if (minCol === undefined || maxCol === undefined) return
+
+    const rowKeys = Object.keys(bitMaskMap).map(r => Number(r))
+
+    const rows = R.range(Math.min(...rowKeys), Math.max(...rowKeys) + 1)
+    const cols = selectionType === 'cell' ? R.range(minCol, maxCol + 1) : R.range(0, headers.length)
+
+    const updates = rows.map(rowIdx => {
+      const currentRow = view[rowIdx]
+      return {
         currentRow,
         editedRow: {
           ...currentRow,
-          ...R.range(x1, x2 + 1)
-            .filter(col => this.isEditable({ header: headers[col], rowData: currentRow }))
+          ...cols
+            .filter(
+              col =>
+                this.isEditable({ header: headers[col], rowData: currentRow }) &&
+                (selectionType === 'cell'
+                  ? isCellSelected(rowIdx, col, this.state)
+                  : isRowSelected(rowIdx, this.state))
+            )
             .map(col => ({ [headers[col].ident]: null }))
             .reduce((a, b) => ({ ...a, ...b }), {}),
         },
-      }))
+      }
+    })
 
     // console.log('updates are ', updates)
     this.batchUpdate(updates)
@@ -1110,7 +1206,7 @@ class Grid extends React.PureComponent {
 
   onPaste = e => {
     e.preventDefault()
-    const selection = fromEmpty(normalizeSelection(this.state))
+    const selection = fromEmpty(this.state.previousRectangleSelection || {})
     const clipboardData = fromPasteEvent(e)
 
     Just(normalizePasteInfo)

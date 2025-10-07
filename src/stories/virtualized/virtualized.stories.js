@@ -213,7 +213,7 @@ storiesOf('Virtualized grid', module)
 
       const [selectionType, setSelectionType] = useState('cell')
 
-      const [isCtrl, setIsCtrl] = useState(false)
+      const [isCtrl, setIsCtrl] = useState(true)
 
       return (
         <>

@@ -3,10 +3,10 @@ import { fromNullable } from 'data.maybe'
 import { fromEmpty } from './utils'
 
 // prettier-ignore
-const combineClipboardCells = R.reduce( (a, b) => (a === '' ? b : `${a}\t${b}`), '')
+const combineClipboardCells = R.join('\t')
 
 // prettier-ignore
-const combineClipboardRows = R.reduce( (a, b) => (a === '' ? b : `${a}\n${b}`), '')
+const combineClipboardRows = R.join('\n')
 
 const normalizeCellsForClipboard = R.map(a => fromEmpty(a).getOrElse(''))
 

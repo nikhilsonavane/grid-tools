@@ -168,7 +168,29 @@ storiesOf('Virtualized grid', module)
     />
   ))
   .add('Fixed Col and Free edit', () => (
-    <GridToolContext.Provider value={{ columnHeaderProps: { backgroundColor: 'pink' } }}>
+    <GridToolContext.Provider
+      value={{
+        columnHeaderProps: {
+          backgroundColor: 'pink',
+          color: '#3F4752',
+          border: '1px solid #ccc',
+          fontSize: '14px',
+          headerRowHeight: 30,
+        },
+        rowContentProps: {
+          color: '#3F4752',
+          border: '1px solid #ccc',
+          // rowHeight: 30,
+          fontSize: '14px',
+        },
+        fixedColData: {
+          border: '1px solid #ccc',
+          color: '#3F4752',
+          rowHeight: 30,
+          verticalAlign: 'baseline',
+        },
+      }}
+    >
       <Grid
         isEditable={() => true}
         editMode="cell"
@@ -185,3 +207,123 @@ storiesOf('Virtualized grid', module)
   ))
   .add('Scroll Trigger', () => <GridWithScrollTrigger />)
   .add('Scroll Sync', () => <GridWithScrollSync />)
+  .add('Custom Multi Selection', () => {
+    const CustomSelectionStory = () => {
+      const subGridRef = useRef()
+
+      const [selectionType, setSelectionType] = useState('cell')
+
+      const [isCtrl, setIsCtrl] = useState(true)
+
+      return (
+        <>
+          <div>Selection Type:</div>
+          <div
+            style={{
+              display: 'flex',
+              width: 200,
+              marginBottom: 10,
+              textAlign: 'center',
+              border: '1px solid #ccc',
+              borderRadius: 4,
+            }}
+          >
+            <div
+              style={{
+                width: '50%',
+                cursor: 'pointer',
+                backgroundColor: selectionType === 'cell' ? 'lightblue' : 'transparent',
+                padding: 4,
+              }}
+              onClick={() => setSelectionType('cell')}
+            >
+              Cell
+            </div>
+            <div
+              style={{
+                width: '50%',
+                cursor: 'pointer',
+                backgroundColor: selectionType === 'row' ? 'lightblue' : 'transparent',
+                padding: 4,
+              }}
+              onClick={() => setSelectionType('row')}
+            >
+              Row
+            </div>
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <input
+              type="checkbox"
+              id="isCtrl"
+              name="isCtrl"
+              value={!!isCtrl}
+              checked={!!isCtrl}
+              onChange={() => setIsCtrl(!isCtrl)}
+            />
+            <label htmlFor="isCtrl">Is Ctrl</label>
+          </div>
+          <div style={{ display: 'flex', gap: 30, marginBottom: 10 }}>
+            <div
+              style={{
+                backgroundColor: 'lightblue',
+                boxShadow: '0 0 5px rgba(0,0,0,0.5)',
+                padding: 4,
+                cursor: 'pointer',
+              }}
+              onClick={() => {
+                subGridRef.current.setSelectedRect({ x1: 1, y1: 1, x2: 2, y2: 3, isCtrl: isCtrl })
+              }}
+            >
+              {'{x1: 1, y1: 1, x2: 2, y2: 3}'}
+            </div>
+            <div
+              style={{
+                backgroundColor: 'lightblue',
+                boxShadow: '0 0 5px rgba(0,0,0,0.5)',
+                padding: 4,
+                cursor: 'pointer',
+              }}
+              onClick={() => {
+                subGridRef.current.setSelectedRect({ x1: 4, y1: 4, x2: 6, y2: 7, isCtrl: isCtrl })
+              }}
+            >
+              {'{x1: 4, y1: 4, x2: 6, y2: 7}'}
+            </div>
+            <div
+              style={{
+                backgroundColor: 'lightblue',
+                boxShadow: '0 0 5px rgba(0,0,0,0.5)',
+                padding: 4,
+                cursor: 'pointer',
+              }}
+              onClick={() => {
+                subGridRef.current.setSelectedRect({ x1: 7, y1: 7, x2: 9, y2: 10, isCtrl: isCtrl })
+              }}
+            >
+              {'{x1: 7, y1: 7, x2: 9, y2: 10}'}
+            </div>
+          </div>
+          <Grid
+            ref={subGridRef}
+            isEditable={() => true}
+            data={data}
+            selectionType={selectionType || 'cell'}
+            selectionMode={'multi'}
+            editMode="cell"
+            headers={headers}
+            render={virtualizedGridRenderer({
+              cellRender: props => {
+                const type =
+                  props.gridToolProps.headers[props.reactVirtualizedProps.columnIndex].type
+                return defaultVirtualizedCellRender({
+                  ...props,
+                  editRender: (type === 'date-time' || type === 'date') && dateInputCellEditRender,
+                })
+              },
+            })}
+          />
+        </>
+      )
+    }
+    return <CustomSelectionStory />
+  })

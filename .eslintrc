@@ -28,5 +28,8 @@
   "env": {
     "browser": true,
     "node": true
+  },
+  "globals": {
+    "BigInt": "readonly"
   }
 }

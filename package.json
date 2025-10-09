@@ -23,6 +23,10 @@
     "type": "git",
     "url": "https:git@github.com:fobbyal/grid-tools.git"
   },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "author": "Alex Liang <aliang@integconsulting.com>",
   "license": "MIT",
   "devDependencies": {

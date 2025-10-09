@@ -1,0 +1,57 @@
+name: Release
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # semantic-release needs tags & history
+
+      # --- Build with Node 12 (your current runtime) ---
+      - name: Use Node 12 for build
+        uses: actions/setup-node@v4
+        with:
+          node-version: 12
+          cache: yarn
+
+      - name: Install (Node 12)
+        run: yarn install --frozen-lockfile
+
+      - name: Test (Node 12)
+        run: yarn test --if-present
+
+      - name: Build (Node 12)
+        run: yarn build:prod
+
+      # If your npm package tarball needs files from ./dist,
+      # make sure they're included via "files" in package.json.
+
+      # --- Switch to Node 20 just for semantic-release ---
+      - name: Use Node 20 for release tooling
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install release tooling
+        run: |
+          # keep app deps; add/ensure dev release deps are present
+          yarn add -D semantic-release @semantic-release/npm \
+            @semantic-release/github @semantic-release/git \
+            @semantic-release/commit-analyzer \
+            @semantic-release/release-notes-generator
+
+      - name: Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }} # add in repo settings
+        run: npx semantic-release

@@ -42,3 +42,7 @@ Things to consider (transposing the data)
   //
 }
 ```
+
+## CICD
+
+this now uses github actions
